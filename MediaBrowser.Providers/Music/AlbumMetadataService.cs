@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Audio;
@@ -53,6 +54,12 @@ namespace MediaBrowser.Providers.Music
         protected override ItemUpdateType UpdateMetadataFromChildren(MusicAlbum item, IList<BaseItem> children, bool isFullRefresh, ItemUpdateType currentUpdateType)
         {
             var updateType = base.UpdateMetadataFromChildren(item, children, isFullRefresh, currentUpdateType);
+
+            // don't update user-changeable metadata for locked items
+            if (item.IsLocked)
+            {
+                return updateType;
+            }
 
             if (isFullRefresh || currentUpdateType > ItemUpdateType.None)
             {
@@ -141,7 +148,7 @@ namespace MediaBrowser.Providers.Music
                 .ToArray();
 
             var id = item.GetProviderId(provider);
-            if (ids.Any())
+            if (ids.Length != 0)
             {
                 var firstId = ids[0];
                 if (!string.IsNullOrEmpty(firstId)
@@ -181,7 +188,7 @@ namespace MediaBrowser.Providers.Music
                     PeopleHelper.AddPerson(people, new PersonInfo
                     {
                         Name = albumArtist,
-                        Type = "AlbumArtist"
+                        Type = PersonKind.AlbumArtist
                     });
                 }
 
@@ -190,7 +197,7 @@ namespace MediaBrowser.Providers.Music
                     PeopleHelper.AddPerson(people, new PersonInfo
                     {
                         Name = artist,
-                        Type = "Artist"
+                        Type = PersonKind.Artist
                     });
                 }
 
@@ -217,6 +224,10 @@ namespace MediaBrowser.Providers.Music
             if (replaceData || targetItem.Artists.Count == 0)
             {
                 targetItem.Artists = sourceItem.Artists;
+            }
+            else
+            {
+                targetItem.Artists = targetItem.Artists.Concat(sourceItem.Artists).Distinct().ToArray();
             }
 
             if (replaceData || string.IsNullOrEmpty(targetItem.GetProviderId(MetadataProvider.MusicBrainzAlbumArtist)))

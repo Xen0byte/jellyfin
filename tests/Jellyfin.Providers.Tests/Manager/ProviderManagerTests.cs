@@ -11,11 +11,13 @@ using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Lyrics;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Controller.Subtitles;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Providers.Manager;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -82,7 +84,7 @@ namespace Jellyfin.Providers.Tests.Manager
             AddParts(providerManager, metadataServices: servicesList.Select(s => s.Object).ToArray());
 
             var refreshOptions = new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict));
-            var actual = await providerManager.RefreshSingleItem(item, refreshOptions, CancellationToken.None).ConfigureAwait(false);
+            var actual = await providerManager.RefreshSingleItem(item, refreshOptions, CancellationToken.None);
 
             Assert.Equal(ItemUpdateType.MetadataDownload, actual);
             for (var i = 0; i < servicesList.Length; i++)
@@ -105,7 +107,7 @@ namespace Jellyfin.Providers.Tests.Manager
             AddParts(providerManager, metadataServices: servicesList.Select(s => s.Object).ToArray());
 
             var refreshOptions = new MetadataRefreshOptions(Mock.Of<IDirectoryService>(MockBehavior.Strict));
-            var actual = await providerManager.RefreshSingleItem(item, refreshOptions, CancellationToken.None).ConfigureAwait(false);
+            var actual = await providerManager.RefreshSingleItem(item, refreshOptions, CancellationToken.None);
 
             var expectedResult = serviceFound ? ItemUpdateType.MetadataDownload : ItemUpdateType.None;
             Assert.Equal(expectedResult, actual);
@@ -368,8 +370,8 @@ namespace Jellyfin.Providers.Tests.Manager
         [Theory]
         [InlineData(nameof(ICustomMetadataProvider), true)]
         [InlineData(nameof(IRemoteMetadataProvider), true)]
-        [InlineData(nameof(ILocalMetadataProvider), false)]
-        public void GetMetadataProviders_CanRefreshMetadataOwned_WhenNotLocal(string providerType, bool expected)
+        [InlineData(nameof(ILocalMetadataProvider), true)]
+        public void GetMetadataProviders_CanRefreshMetadataOwned(string providerType, bool expected)
         {
             GetMetadataProviders_CanRefreshMetadata_Tester(providerType, expected, ownedItem: true);
         }
@@ -570,7 +572,10 @@ namespace Jellyfin.Providers.Tests.Manager
                 Mock.Of<IFileSystem>(),
                 Mock.Of<IServerApplicationPaths>(),
                 libraryManager.Object,
-                baseItemManager!);
+                baseItemManager!,
+                Mock.Of<ILyricManager>(),
+                Mock.Of<IMemoryCache>(),
+                Mock.Of<IMediaSegmentManager>());
 
             return providerManager;
         }
@@ -581,15 +586,17 @@ namespace Jellyfin.Providers.Tests.Manager
             IEnumerable<IMetadataService>? metadataServices = null,
             IEnumerable<IMetadataProvider>? metadataProviders = null,
             IEnumerable<IMetadataSaver>? metadataSavers = null,
-            IEnumerable<IExternalId>? externalIds = null)
+            IEnumerable<IExternalId>? externalIds = null,
+            IEnumerable<IExternalUrlProvider>? externalUrlProviders = null)
         {
             imageProviders ??= Array.Empty<IImageProvider>();
             metadataServices ??= Array.Empty<IMetadataService>();
             metadataProviders ??= Array.Empty<IMetadataProvider>();
             metadataSavers ??= Array.Empty<IMetadataSaver>();
             externalIds ??= Array.Empty<IExternalId>();
+            externalUrlProviders ??= Array.Empty<IExternalUrlProvider>();
 
-            providerManager.AddParts(imageProviders, metadataServices, metadataProviders, metadataSavers, externalIds);
+            providerManager.AddParts(imageProviders, metadataServices, metadataProviders, metadataSavers, externalIds, externalUrlProviders);
         }
 
         /// <summary>

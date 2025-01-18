@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Serialization;
 using Jellyfin.Data.Enums;
+using Jellyfin.Extensions;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
@@ -74,12 +75,12 @@ namespace MediaBrowser.Controller.Entities.TV
             get
             {
                 var seriesId = SeriesId;
-                if (seriesId.Equals(default))
+                if (seriesId.IsEmpty())
                 {
                     seriesId = FindSeriesId();
                 }
 
-                return seriesId.Equals(default) ? null : (LibraryManager.GetItemById(seriesId) as Series);
+                return seriesId.IsEmpty() ? null : (LibraryManager.GetItemById(seriesId) as Series);
             }
         }
 
@@ -89,17 +90,17 @@ namespace MediaBrowser.Controller.Entities.TV
             get
             {
                 var seasonId = SeasonId;
-                if (seasonId.Equals(default))
+                if (seasonId.IsEmpty())
                 {
                     seasonId = FindSeasonId();
                 }
 
-                return seasonId.Equals(default) ? null : (LibraryManager.GetItemById(seasonId) as Season);
+                return seasonId.IsEmpty() ? null : (LibraryManager.GetItemById(seasonId) as Season);
             }
         }
 
         [JsonIgnore]
-        public bool IsInSeasonFolder => FindParent<Season>() != null;
+        public bool IsInSeasonFolder => FindParent<Season>() is not null;
 
         [JsonIgnore]
         public string SeriesPresentationUniqueKey { get; set; }
@@ -179,10 +180,7 @@ namespace MediaBrowser.Controller.Entities.TV
         }
 
         public string FindSeriesPresentationUniqueKey()
-        {
-            var series = Series;
-            return series is null ? null : series.PresentationUniqueKey;
-        }
+            => Series?.PresentationUniqueKey;
 
         public string FindSeasonName()
         {
@@ -271,7 +269,7 @@ namespace MediaBrowser.Controller.Entities.TV
 
             var seasonId = SeasonId;
 
-            if (!seasonId.Equals(default) && !list.Contains(seasonId))
+            if (!seasonId.IsEmpty() && !list.Contains(seasonId))
             {
                 list.Add(seasonId);
             }
@@ -308,6 +306,11 @@ namespace MediaBrowser.Controller.Entities.TV
                 id.SeriesDisplayOrder = series.DisplayOrder;
             }
 
+            if (Season is not null)
+            {
+                id.SeasonProviderIds = Season.ProviderIds;
+            }
+
             id.IsMissingEpisode = IsMissingEpisode;
             id.IndexNumberEnd = IndexNumberEnd;
 
@@ -320,7 +323,7 @@ namespace MediaBrowser.Controller.Entities.TV
 
             if (!IsLocked)
             {
-                if (SourceType == SourceType.Library)
+                if (SourceType == SourceType.Library || SourceType == SourceType.LiveTV)
                 {
                     try
                     {
@@ -337,23 +340,6 @@ namespace MediaBrowser.Controller.Entities.TV
             }
 
             return hasChanges;
-        }
-
-        public override List<ExternalUrl> GetRelatedUrls()
-        {
-            var list = base.GetRelatedUrls();
-
-            var imdbId = this.GetProviderId(MetadataProvider.Imdb);
-            if (!string.IsNullOrEmpty(imdbId))
-            {
-                list.Add(new ExternalUrl
-                {
-                    Name = "Trakt",
-                    Url = string.Format(CultureInfo.InvariantCulture, "https://trakt.tv/episodes/{0}", imdbId)
-                });
-            }
-
-            return list;
         }
     }
 }

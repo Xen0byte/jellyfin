@@ -1,7 +1,8 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Resolvers;
+using MediaBrowser.Model.Lyrics;
+using MediaBrowser.Model.Providers;
 
 namespace MediaBrowser.Controller.Lyrics;
 
@@ -11,26 +12,23 @@ namespace MediaBrowser.Controller.Lyrics;
 public interface ILyricProvider
 {
     /// <summary>
-    /// Gets a value indicating the provider name.
+    /// Gets the provider name.
     /// </summary>
     string Name { get; }
 
     /// <summary>
-    /// Gets the priority.
+    /// Search for lyrics.
     /// </summary>
-    /// <value>The priority.</value>
-    ResolverPriority Priority { get; }
+    /// <param name="request">The search request.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The list of remote lyrics.</returns>
+    Task<IEnumerable<RemoteLyricInfo>> SearchAsync(LyricSearchRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Gets the supported media types for this provider.
+    /// Get the lyrics.
     /// </summary>
-    /// <value>The supported media types.</value>
-    IReadOnlyCollection<string> SupportedMediaTypes { get; }
-
-    /// <summary>
-    /// Gets the lyrics.
-    /// </summary>
-    /// <param name="item">The media item.</param>
-    /// <returns>A task representing found lyrics.</returns>
-    Task<LyricResponse?> GetLyrics(BaseItem item);
+    /// <param name="id">The remote lyric id.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The lyric response.</returns>
+    Task<LyricResponse?> GetLyricsAsync(string id, CancellationToken cancellationToken);
 }

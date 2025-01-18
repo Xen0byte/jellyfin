@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data.Enums;
 using Jellyfin.Extensions;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Entities;
@@ -72,10 +73,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.TV
                 result.Item.Name = seasonResult.Name;
             }
 
-            if (!string.IsNullOrEmpty(seasonResult.ExternalIds?.TvdbId))
-            {
-                result.Item.SetProviderId(MetadataProvider.Tvdb, seasonResult.ExternalIds.TvdbId);
-            }
+            result.Item.TrySetProviderId(MetadataProvider.Tvdb, seasonResult.ExternalIds.TvdbId);
 
             // TODO why was this disabled?
             var credits = seasonResult.Credits;
@@ -88,7 +86,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.TV
                     {
                         Name = cast[i].Name.Trim(),
                         Role = cast[i].Character,
-                        Type = PersonType.Actor,
+                        Type = PersonKind.Actor,
                         SortOrder = cast[i].Order
                     });
                 }
@@ -101,7 +99,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.TV
                     // Normalize this
                     var type = TmdbUtils.MapCrewToPersonType(person);
 
-                    if (!TmdbUtils.WantedCrewTypes.Contains(type, StringComparison.OrdinalIgnoreCase)
+                    if (!TmdbUtils.WantedCrewKinds.Contains(type)
                         && !TmdbUtils.WantedCrewTypes.Contains(person.Job ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;

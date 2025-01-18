@@ -26,8 +26,10 @@ namespace MediaBrowser.Controller.Providers
             ReplaceAllMetadata = copy.ReplaceAllMetadata;
             EnableRemoteContentProbe = copy.EnableRemoteContentProbe;
 
+            IsAutomated = copy.IsAutomated;
             ImageRefreshMode = copy.ImageRefreshMode;
             ReplaceAllImages = copy.ReplaceAllImages;
+            RegenerateTrickplay = copy.RegenerateTrickplay;
             ReplaceImages = copy.ReplaceImages;
             SearchResult = copy.SearchResult;
             RemoveOldMetadata = copy.RemoveOldMetadata;
@@ -45,6 +47,12 @@ namespace MediaBrowser.Controller.Providers
         /// when paired with MetadataRefreshMode=FullRefresh.
         /// </summary>
         public bool ReplaceAllMetadata { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether all existing trickplay images should be overwritten
+        /// when paired with MetadataRefreshMode=FullRefresh.
+        /// </summary>
+        public bool RegenerateTrickplay { get; set; }
 
         public MetadataRefreshMode MetadataRefreshMode { get; set; }
 

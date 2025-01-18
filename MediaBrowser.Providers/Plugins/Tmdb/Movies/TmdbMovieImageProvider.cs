@@ -1,5 +1,3 @@
-#nullable disable
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -49,15 +47,13 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
         }
 
         /// <inheritdoc />
-        public IEnumerable<ImageType> GetSupportedImages(BaseItem item)
-        {
-            return new List<ImageType>
-            {
-                ImageType.Primary,
-                ImageType.Backdrop,
-                ImageType.Logo
-            };
-        }
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item) =>
+        [
+            ImageType.Primary,
+            ImageType.Backdrop,
+            ImageType.Logo,
+            ImageType.Thumb
+        ];
 
         /// <inheritdoc />
         public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
@@ -100,9 +96,9 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
             var logos = movie.Images.Logos;
             var remoteImages = new List<RemoteImageInfo>(posters.Count + backdrops.Count + logos.Count);
 
-            _tmdbClientManager.ConvertPostersToRemoteImageInfo(posters, language, remoteImages);
-            _tmdbClientManager.ConvertBackdropsToRemoteImageInfo(backdrops, language, remoteImages);
-            _tmdbClientManager.ConvertLogosToRemoteImageInfo(logos, language, remoteImages);
+            remoteImages.AddRange(_tmdbClientManager.ConvertPostersToRemoteImageInfo(posters, language));
+            remoteImages.AddRange(_tmdbClientManager.ConvertBackdropsToRemoteImageInfo(backdrops, language));
+            remoteImages.AddRange(_tmdbClientManager.ConvertLogosToRemoteImageInfo(logos, language));
 
             return remoteImages;
         }

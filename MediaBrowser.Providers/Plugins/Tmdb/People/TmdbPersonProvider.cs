@@ -1,5 +1,3 @@
-#nullable disable
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -58,10 +56,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.People
                     }
 
                     result.SetProviderId(MetadataProvider.Tmdb, personResult.Id.ToString(CultureInfo.InvariantCulture));
-                    if (!string.IsNullOrEmpty(personResult.ExternalIds.ImdbId))
-                    {
-                        result.SetProviderId(MetadataProvider.Imdb, personResult.ExternalIds.ImdbId);
-                    }
+                    result.TrySetProviderId(MetadataProvider.Imdb, personResult.ExternalIds.ImdbId);
 
                     return new[] { result };
                 }
@@ -69,7 +64,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.People
 
             var personSearchResult = await _tmdbClientManager.SearchPersonAsync(searchInfo.Name, cancellationToken).ConfigureAwait(false);
 
-            var remoteSearchResults = new List<RemoteSearchResult>();
+            var remoteSearchResults = new RemoteSearchResult[personSearchResult.Count];
             for (var i = 0; i < personSearchResult.Count; i++)
             {
                 var person = personSearchResult[i];
@@ -81,7 +76,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.People
                 };
 
                 remoteSearchResult.SetProviderId(MetadataProvider.Tmdb, person.Id.ToString(CultureInfo.InvariantCulture));
-                remoteSearchResults.Add(remoteSearchResult);
+                remoteSearchResults[i] = remoteSearchResult;
             }
 
             return remoteSearchResults;
@@ -107,6 +102,10 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.People
             if (personTmdbId > 0)
             {
                 var person = await _tmdbClientManager.GetPersonAsync(personTmdbId, info.MetadataLanguage, cancellationToken).ConfigureAwait(false);
+                if (person is null)
+                {
+                    return result;
+                }
 
                 result.HasMetadata = true;
 
@@ -127,11 +126,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.People
                 }
 
                 item.SetProviderId(MetadataProvider.Tmdb, person.Id.ToString(CultureInfo.InvariantCulture));
-
-                if (!string.IsNullOrEmpty(person.ImdbId))
-                {
-                    item.SetProviderId(MetadataProvider.Imdb, person.ImdbId);
-                }
+                item.TrySetProviderId(MetadataProvider.Imdb, person.ImdbId);
 
                 result.HasMetadata = true;
                 result.Item = item;

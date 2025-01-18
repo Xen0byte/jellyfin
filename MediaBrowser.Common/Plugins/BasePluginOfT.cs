@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
@@ -20,12 +21,12 @@ namespace MediaBrowser.Common.Plugins
         /// <summary>
         /// The configuration sync lock.
         /// </summary>
-        private readonly object _configurationSyncLock = new object();
+        private readonly Lock _configurationSyncLock = new();
 
         /// <summary>
         /// The configuration save lock.
         /// </summary>
-        private readonly object _configurationSaveLock = new object();
+        private readonly Lock _configurationSaveLock = new();
 
         /// <summary>
         /// The configuration.
@@ -50,7 +51,7 @@ namespace MediaBrowser.Common.Plugins
             if (Version is not null && !Directory.Exists(dataFolderPath))
             {
                 // Try again with the version number appended to the folder name.
-                dataFolderPath += "_" + Version.ToString();
+                dataFolderPath += "_" + Version;
             }
 
             SetAttributes(assemblyFilePath, dataFolderPath, assemblyName.Version);
@@ -193,7 +194,7 @@ namespace MediaBrowser.Common.Plugins
             }
             catch
             {
-                var config = (TConfigurationType)Activator.CreateInstance(typeof(TConfigurationType));
+                var config = Activator.CreateInstance<TConfigurationType>();
                 SaveConfiguration(config);
                 return config;
             }

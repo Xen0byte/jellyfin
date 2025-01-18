@@ -67,7 +67,7 @@ namespace Emby.Server.Implementations.SyncPlay
         /// <remarks>
         /// This lock has priority on locks made on <see cref="Group"/>.
         /// </remarks>
-        private readonly object _groupsLock = new object();
+        private readonly Lock _groupsLock = new();
 
         private bool _disposed = false;
 
@@ -339,10 +339,8 @@ namespace Emby.Server.Implementations.SyncPlay
             {
                 return sessionsCounter > 0;
             }
-            else
-            {
-                return false;
-            }
+
+            return false;
         }
 
         /// <summary>

@@ -1,5 +1,3 @@
-#nullable disable
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -7,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data.Enums;
 using Jellyfin.Extensions;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Entities;
@@ -64,32 +63,31 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                var remoteResult = new RemoteSearchResult
+                if (movie is not null)
                 {
-                    Name = movie.Title ?? movie.OriginalTitle,
-                    SearchProviderName = Name,
-                    ImageUrl = _tmdbClientManager.GetPosterUrl(movie.PosterPath),
-                    Overview = movie.Overview
-                };
+                    var remoteResult = new RemoteSearchResult
+                    {
+                        Name = movie.Title ?? movie.OriginalTitle,
+                        SearchProviderName = Name,
+                        ImageUrl = _tmdbClientManager.GetPosterUrl(movie.PosterPath),
+                        Overview = movie.Overview
+                    };
 
-                if (movie.ReleaseDate is not null)
-                {
-                    var releaseDate = movie.ReleaseDate.Value.ToUniversalTime();
-                    remoteResult.PremiereDate = releaseDate;
-                    remoteResult.ProductionYear = releaseDate.Year;
+                    if (movie.ReleaseDate is not null)
+                    {
+                        var releaseDate = movie.ReleaseDate.Value.ToUniversalTime();
+                        remoteResult.PremiereDate = releaseDate;
+                        remoteResult.ProductionYear = releaseDate.Year;
+                    }
+
+                    remoteResult.SetProviderId(MetadataProvider.Tmdb, movie.Id.ToString(CultureInfo.InvariantCulture));
+                    remoteResult.TrySetProviderId(MetadataProvider.Imdb, movie.ImdbId);
+
+                    return new[] { remoteResult };
                 }
-
-                remoteResult.SetProviderId(MetadataProvider.Tmdb, movie.Id.ToString(CultureInfo.InvariantCulture));
-
-                if (!string.IsNullOrWhiteSpace(movie.ImdbId))
-                {
-                    remoteResult.SetProviderId(MetadataProvider.Imdb, movie.ImdbId);
-                }
-
-                return new[] { remoteResult };
             }
 
-            IReadOnlyList<SearchMovie> movieResults;
+            IReadOnlyList<SearchMovie>? movieResults = null;
             if (searchInfo.TryGetProviderId(MetadataProvider.Imdb, out id))
             {
                 var result = await _tmdbClientManager.FindByExternalIdAsync(
@@ -97,18 +95,20 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
                     FindExternalSource.Imdb,
                     TmdbUtils.GetImageLanguagesParam(searchInfo.MetadataLanguage),
                     cancellationToken).ConfigureAwait(false);
-                movieResults = result.MovieResults;
+                movieResults = result?.MovieResults;
             }
-            else if (searchInfo.TryGetProviderId(MetadataProvider.Tvdb, out id))
+
+            if (movieResults is null && searchInfo.TryGetProviderId(MetadataProvider.Tvdb, out id))
             {
                 var result = await _tmdbClientManager.FindByExternalIdAsync(
                     id,
                     FindExternalSource.TvDb,
                     TmdbUtils.GetImageLanguagesParam(searchInfo.MetadataLanguage),
                     cancellationToken).ConfigureAwait(false);
-                movieResults = result.MovieResults;
+                movieResults = result?.MovieResults;
             }
-            else
+
+            if (movieResults is null)
             {
                 movieResults = await _tmdbClientManager
                     .SearchMovieAsync(searchInfo.Name, searchInfo.Year ?? 0, searchInfo.MetadataLanguage, cancellationToken)
@@ -198,7 +198,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
             };
 
             movie.SetProviderId(MetadataProvider.Tmdb, tmdbId);
-            movie.SetProviderId(MetadataProvider.Imdb, movieResult.ImdbId);
+            movie.TrySetProviderId(MetadataProvider.Imdb, movieResult.ImdbId);
             if (movieResult.BelongsToCollection is not null)
             {
                 movie.SetProviderId(MetadataProvider.TmdbCollection, movieResult.BelongsToCollection.Id.ToString(CultureInfo.InvariantCulture));
@@ -255,7 +255,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
                     {
                         Name = actor.Name.Trim(),
                         Role = actor.Character,
-                        Type = PersonType.Actor,
+                        Type = PersonKind.Actor,
                         SortOrder = actor.Order
                     };
 
@@ -275,20 +275,13 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
 
             if (movieResult.Credits?.Crew is not null)
             {
-                var keepTypes = new[]
-                {
-                    PersonType.Director,
-                    PersonType.Writer,
-                    PersonType.Producer
-                };
-
                 foreach (var person in movieResult.Credits.Crew)
                 {
                     // Normalize this
                     var type = TmdbUtils.MapCrewToPersonType(person);
 
-                    if (!keepTypes.Contains(type, StringComparison.OrdinalIgnoreCase) &&
-                        !keepTypes.Contains(person.Job ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                    if (!TmdbUtils.WantedCrewKinds.Contains(type)
+                        && !TmdbUtils.WantedCrewTypes.Contains(person.Job ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -302,7 +295,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.Movies
 
                     if (!string.IsNullOrWhiteSpace(person.ProfilePath))
                     {
-                        personInfo.ImageUrl = _tmdbClientManager.GetPosterUrl(person.ProfilePath);
+                        personInfo.ImageUrl = _tmdbClientManager.GetProfileUrl(person.ProfilePath);
                     }
 
                     if (person.Id > 0)

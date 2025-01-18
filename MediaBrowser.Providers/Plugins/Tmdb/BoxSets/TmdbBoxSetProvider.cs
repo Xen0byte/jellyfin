@@ -1,5 +1,3 @@
-#nullable disable
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -74,17 +72,19 @@ namespace MediaBrowser.Providers.Plugins.Tmdb.BoxSets
 
             var collectionSearchResults = await _tmdbClientManager.SearchCollectionAsync(searchInfo.Name, language, cancellationToken).ConfigureAwait(false);
 
-            var collections = new List<RemoteSearchResult>();
+            var collections = new RemoteSearchResult[collectionSearchResults.Count];
             for (var i = 0; i < collectionSearchResults.Count; i++)
             {
+                var result = collectionSearchResults[i];
                 var collection = new RemoteSearchResult
                 {
-                    Name = collectionSearchResults[i].Name,
-                    SearchProviderName = Name
+                    Name = result.Name,
+                    SearchProviderName = Name,
+                    ImageUrl = _tmdbClientManager.GetPosterUrl(result.PosterPath)
                 };
-                collection.SetProviderId(MetadataProvider.Tmdb, collectionSearchResults[i].Id.ToString(CultureInfo.InvariantCulture));
+                collection.SetProviderId(MetadataProvider.Tmdb, result.Id.ToString(CultureInfo.InvariantCulture));
 
-                collections.Add(collection);
+                collections[i] = collection;
             }
 
             return collections;

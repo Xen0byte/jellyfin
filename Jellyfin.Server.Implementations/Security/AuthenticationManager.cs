@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Data.Entities.Security;
@@ -10,13 +10,13 @@ namespace Jellyfin.Server.Implementations.Security
     /// <inheritdoc />
     public class AuthenticationManager : IAuthenticationManager
     {
-        private readonly IDbContextFactory<JellyfinDb> _dbProvider;
+        private readonly IDbContextFactory<JellyfinDbContext> _dbProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AuthenticationManager"/> class.
         /// </summary>
         /// <param name="dbProvider">The database provider.</param>
-        public AuthenticationManager(IDbContextFactory<JellyfinDb> dbProvider)
+        public AuthenticationManager(IDbContextFactory<JellyfinDbContext> dbProvider)
         {
             _dbProvider = dbProvider;
         }
@@ -40,7 +40,6 @@ namespace Jellyfin.Server.Implementations.Security
             await using (dbContext.ConfigureAwait(false))
             {
                 return await dbContext.ApiKeys
-                    .AsAsyncEnumerable()
                     .Select(key => new AuthenticationInfo
                     {
                         AppName = key.Name,
@@ -59,20 +58,10 @@ namespace Jellyfin.Server.Implementations.Security
             var dbContext = await _dbProvider.CreateDbContextAsync().ConfigureAwait(false);
             await using (dbContext.ConfigureAwait(false))
             {
-                var key = await dbContext.ApiKeys
-                    .AsQueryable()
+                await dbContext.ApiKeys
                     .Where(apiKey => apiKey.AccessToken == accessToken)
-                    .FirstOrDefaultAsync()
+                    .ExecuteDeleteAsync()
                     .ConfigureAwait(false);
-
-                if (key is null)
-                {
-                    return;
-                }
-
-                dbContext.Remove(key);
-
-                await dbContext.SaveChangesAsync().ConfigureAwait(false);
             }
         }
     }

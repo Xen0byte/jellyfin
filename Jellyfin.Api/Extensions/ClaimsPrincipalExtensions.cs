@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Security.Claims;
 using Jellyfin.Api.Constants;
@@ -71,8 +71,7 @@ public static class ClaimsPrincipalExtensions
     public static bool GetIsApiKey(this ClaimsPrincipal user)
     {
         var claimValue = GetClaimValue(user, InternalClaimTypes.IsApiKey);
-        return !string.IsNullOrEmpty(claimValue)
-               && bool.TryParse(claimValue, out var parsedClaimValue)
+        return bool.TryParse(claimValue, out var parsedClaimValue)
                && parsedClaimValue;
     }
 

@@ -53,10 +53,7 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
         /// <inheritdoc />
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item)
         {
-            return new List<ImageType>
-            {
-                ImageType.Thumb
-            };
+            return [ImageType.Thumb];
         }
 
         /// <inheritdoc />
@@ -64,7 +61,7 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
         {
             var thumbsPath = Path.Combine(_config.ApplicationPaths.CachePath, "imagesbyname", "remotestudiothumbs.txt");
 
-            thumbsPath = await EnsureThumbsList(thumbsPath, cancellationToken).ConfigureAwait(false);
+            await EnsureThumbsList(thumbsPath, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,13 +69,10 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
 
             if (imageInfo is null)
             {
-                return Enumerable.Empty<RemoteImageInfo>();
+                return [];
             }
 
-            return new RemoteImageInfo[]
-            {
-                imageInfo
-            };
+            return [imageInfo];
         }
 
         private RemoteImageInfo GetImage(BaseItem item, string filename, ImageType type, string remoteFilename)
@@ -107,7 +101,7 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
             return string.Format(CultureInfo.InvariantCulture, "{0}/images/{1}/{2}.jpg", GetRepositoryUrl(), image, filename);
         }
 
-        private Task<string> EnsureThumbsList(string file, CancellationToken cancellationToken)
+        private Task EnsureThumbsList(string file, CancellationToken cancellationToken)
         {
             string url = string.Format(CultureInfo.InvariantCulture, "{0}/thumbs.txt", GetRepositoryUrl());
 
@@ -129,7 +123,7 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
         /// <param name="fileSystem">The file system.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A Task to ensure existence of a file listing.</returns>
-        public async Task<string> EnsureList(string url, string file, IFileSystem fileSystem, CancellationToken cancellationToken)
+        public async Task EnsureList(string url, string file, IFileSystem fileSystem, CancellationToken cancellationToken)
         {
             var fileInfo = fileSystem.GetFileInfo(file);
 
@@ -138,12 +132,16 @@ namespace MediaBrowser.Providers.Plugins.StudioImages
                 var httpClient = _httpClientFactory.CreateClient(NamedClient.Default);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(file));
-                await using var response = await httpClient.GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
-                await using var fileStream = new FileStream(file, FileMode.Create, FileAccess.Write, FileShare.None, IODefaults.FileStreamBufferSize, FileOptions.Asynchronous);
-                await response.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                var response = await httpClient.GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+                await using (response.ConfigureAwait(false))
+                {
+                    var fileStream = new FileStream(file, FileMode.Create, FileAccess.Write, FileShare.None, IODefaults.FileStreamBufferSize, FileOptions.Asynchronous);
+                    await using (fileStream.ConfigureAwait(false))
+                    {
+                        await response.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
-
-            return file;
         }
 
         /// <summary>

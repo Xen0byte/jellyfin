@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Emby.Naming.Common;
+using Jellyfin.Extensions;
 using MediaBrowser.Model.IO;
 
 namespace Emby.Naming.Video
@@ -11,8 +12,14 @@ namespace Emby.Naming.Video
     /// <summary>
     /// Resolves alternative versions and extras from list of video files.
     /// </summary>
-    public static class VideoListResolver
+    public static partial class VideoListResolver
     {
+        [GeneratedRegex("[0-9]{2}[0-9]+[ip]", RegexOptions.IgnoreCase)]
+        private static partial Regex ResolutionRegex();
+
+        [GeneratedRegex(@"^\[([^]]*)\]")]
+        private static partial Regex CheckMultiVersionRegex();
+
         /// <summary>
         /// Resolves alternative versions and extras from list of video files.
         /// </summary>
@@ -106,6 +113,7 @@ namespace Emby.Naming.Video
             }
 
             // Cannot use Span inside local functions and delegates thus we cannot use LINQ here nor merge with the above [if]
+            VideoInfo? primary = null;
             for (var i = 0; i < videos.Count; i++)
             {
                 var video = videos[i];
@@ -114,29 +122,45 @@ namespace Emby.Naming.Video
                     continue;
                 }
 
-                if (!IsEligibleForMultiVersion(folderName, video.Files[0].Path, namingOptions))
+                if (!IsEligibleForMultiVersion(folderName, video.Files[0].FileNameWithoutExtension, namingOptions))
                 {
                     return videos;
                 }
+
+                if (folderName.Equals(video.Files[0].FileNameWithoutExtension, StringComparison.Ordinal))
+                {
+                    primary = video;
+                }
             }
 
-            // The list is created and overwritten in the caller, so we are allowed to do in-place sorting
-            videos.Sort((x, y) => string.Compare(x.Name, y.Name, StringComparison.Ordinal));
+            if (videos.Count > 1)
+            {
+                var groups = videos.GroupBy(x => ResolutionRegex().IsMatch(x.Files[0].FileNameWithoutExtension)).ToList();
+                videos.Clear();
+                foreach (var group in groups)
+                {
+                    if (group.Key)
+                    {
+                        videos.InsertRange(0, group
+                            .OrderByDescending(x => ResolutionRegex().Match(x.Files[0].FileNameWithoutExtension.ToString()).Value, new AlphanumericComparator())
+                            .ThenBy(x => x.Files[0].FileNameWithoutExtension.ToString(), new AlphanumericComparator()));
+                    }
+                    else
+                    {
+                        videos.AddRange(group.OrderBy(x => x.Files[0].FileNameWithoutExtension.ToString(), new AlphanumericComparator()));
+                    }
+                }
+            }
+
+            primary ??= videos[0];
+            videos.Remove(primary);
 
             var list = new List<VideoInfo>
             {
-                videos[0]
+                primary
             };
 
-            var alternateVersionsLen = videos.Count - 1;
-            var alternateVersions = new VideoFileInfo[alternateVersionsLen];
-            for (int i = 0; i < alternateVersionsLen; i++)
-            {
-                var video = videos[i + 1];
-                alternateVersions[i] = video.Files[0];
-            }
-
-            list[0].AlternateVersions = alternateVersions;
+            list[0].AlternateVersions = videos.Select(x => x.Files[0]).ToArray();
             list[0].Name = folderName.ToString();
 
             return list;
@@ -161,9 +185,8 @@ namespace Emby.Naming.Video
             return true;
         }
 
-        private static bool IsEligibleForMultiVersion(ReadOnlySpan<char> folderName, string testFilePath, NamingOptions namingOptions)
+        private static bool IsEligibleForMultiVersion(ReadOnlySpan<char> folderName, ReadOnlySpan<char> testFilename, NamingOptions namingOptions)
         {
-            var testFilename = Path.GetFileNameWithoutExtension(testFilePath.AsSpan());
             if (!testFilename.StartsWith(folderName, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -176,16 +199,15 @@ namespace Emby.Naming.Video
             }
 
             // There are no span overloads for regex unfortunately
-            var tmpTestFilename = testFilename.ToString();
-            if (CleanStringParser.TryClean(tmpTestFilename, namingOptions.CleanStringRegexes, out var cleanName))
+            if (CleanStringParser.TryClean(testFilename.ToString(), namingOptions.CleanStringRegexes, out var cleanName))
             {
-                tmpTestFilename = cleanName.Trim();
+                testFilename = cleanName.AsSpan().Trim();
             }
 
             // The CleanStringParser should have removed common keywords etc.
-            return string.IsNullOrEmpty(tmpTestFilename)
+            return testFilename.IsEmpty
                    || testFilename[0] == '-'
-                   || Regex.IsMatch(tmpTestFilename, @"^\[([^]]*)\]", RegexOptions.Compiled);
+                   || CheckMultiVersionRegex().IsMatch(testFilename);
         }
     }
 }
